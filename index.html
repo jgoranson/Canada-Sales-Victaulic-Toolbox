@@ -1779,6 +1779,7 @@ function ToolboxTab({ tools, saveTools, completedProjects, loading, error, reloa
   const [docFiles, setDocFiles] = useState([]);
   const [fromProject, setFromProject] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [confirmId, setConfirmId] = useState(null);
   const [editTool, setEditTool] = useState(null);
   const [viewMode, setViewMode] = useState(
@@ -1808,22 +1809,33 @@ function ToolboxTab({ tools, saveTools, completedProjects, loading, error, reloa
   const resetForm = () => {
     setName(""); setDescription(""); setProblem(""); setInstructions("");
     setUrl(""); setOwner(""); setToolType("Other"); setVideoFile(null); setDocFiles([]);
-    setFromProject(""); setShowForm(false);
+    setFromProject(""); setShowForm(false); setUploadError("");
   };
 
   const addTool = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setUploadError("");
 
     let videoUrl = "";
     if (videoFile) {
       const uploaded = await uploadFile(videoFile, "videos");
-      if (uploaded) videoUrl = uploaded.url;
+      if (!uploaded) {
+        setUploadError('Couldn\'t upload the video — the "toolbox-uploads" storage bucket may not be set up yet in Supabase. Nothing was saved so you don\'t lose track of it; fix the bucket, then hit Save again.');
+        setSaving(false);
+        return;
+      }
+      videoUrl = uploaded.url;
     }
     const documents = [];
     for (const f of docFiles) {
       const uploaded = await uploadFile(f, "documents");
-      if (uploaded) documents.push(uploaded);
+      if (!uploaded) {
+        setUploadError(`Couldn't upload "${f.name}" — the "toolbox-uploads" storage bucket may not be set up yet in Supabase. Nothing was saved so you don't lose track of it; fix the bucket, then hit Save again.`);
+        setSaving(false);
+        return;
+      }
+      documents.push(uploaded);
     }
 
     const next = [
@@ -1902,6 +1914,14 @@ function ToolboxTab({ tools, saveTools, completedProjects, loading, error, reloa
         </button>
       ) : (
         <div style={styles.formCard}>
+          {uploadError && (
+            <div style={{
+              background: "#FDECEA", border: "1px solid #F5C6C0", color: COLORS.blocked,
+              borderRadius: 6, padding: "10px 12px", fontSize: 12.5, lineHeight: 1.5,
+            }}>
+              {uploadError}
+            </div>
+          )}
           <input
             style={styles.input}
             placeholder="Tool or template name"
@@ -2374,6 +2394,7 @@ function ToolDetailModal({ tool, onClose, onSave }) {
   const [documents, setDocuments] = useState(tool.documents || []);
   const [newDocFiles, setNewDocFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const removeDoc = (index) => {
     setDocuments((docs) => docs.filter((_, i) => i !== index));
@@ -2382,16 +2403,27 @@ function ToolDetailModal({ tool, onClose, onSave }) {
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
+    setUploadError("");
 
     let finalVideoUrl = videoUrl;
     if (videoFile) {
       const uploaded = await uploadFile(videoFile, "videos");
-      if (uploaded) finalVideoUrl = uploaded.url;
+      if (!uploaded) {
+        setUploadError('Couldn\'t upload the video — the "toolbox-uploads" storage bucket may not be set up yet in Supabase. Nothing was saved so you don\'t lose track of it; fix the bucket, then hit Save again.');
+        setSaving(false);
+        return;
+      }
+      finalVideoUrl = uploaded.url;
     }
     const uploadedDocs = [];
     for (const f of newDocFiles) {
       const uploaded = await uploadFile(f, "documents");
-      if (uploaded) uploadedDocs.push(uploaded);
+      if (!uploaded) {
+        setUploadError(`Couldn't upload "${f.name}" — the "toolbox-uploads" storage bucket may not be set up yet in Supabase. Nothing was saved so you don't lose track of it; fix the bucket, then hit Save again.`);
+        setSaving(false);
+        return;
+      }
+      uploadedDocs.push(uploaded);
     }
 
     await onSave(tool.id, {
@@ -2430,6 +2462,15 @@ function ToolDetailModal({ tool, onClose, onSave }) {
           <div style={{ fontWeight: 800, fontSize: 17 }}>Edit tool</div>
           <button onClick={onClose} style={styles.iconBtn}><X size={15} /></button>
         </div>
+
+        {uploadError && (
+          <div style={{
+            background: "#FDECEA", border: "1px solid #F5C6C0", color: COLORS.blocked,
+            borderRadius: 6, padding: "10px 12px", fontSize: 12.5, lineHeight: 1.5,
+          }}>
+            {uploadError}
+          </div>
+        )}
 
         <div>
           <div style={styles.fieldLabel}>Tool or template name</div>
